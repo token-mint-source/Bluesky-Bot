@@ -1,7 +1,11 @@
 import os
 import time
+from flask import Flask, render_template, request, redirect, url_for, flash
 from atproto import Client, models
 from datetime import datetime
+
+app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET', 'dev-secret-key')
 
 # Initialize Bluesky client
 client = Client()
@@ -12,56 +16,37 @@ def authenticate():
     password = os.getenv('BLUESKY_PASSWORD')
     
     if not handle or not password:
-        raise ValueError("Missing Bluesky credentials in environment variables")
+        raise ValueError("Missing Bluesky credentials")
+    
+    if not handle.endswith(".bsky.social"):
+        handle += ".bsky.social"
     
     client.login(handle, password)
-    print(f"Authenticated as {handle} at {datetime.now().isoformat()}")
+    print(f"Authenticated as {handle}")
 
-def post_message(text):
-    """Create a new post"""
-    try:
-        client.send_post(text=text)
-        print(f"Posted: {text}")
-    except Exception as e:
-        print(f"Post failed: {str(e)}")
-
-def reply_to_mentions():
-    """Check and reply to mentions"""
-    try:
-        notifications = client.get_notifications()
-        for notification in notifications.notifications:
-            if notification.reason == 'mention' and not notification.is_read:
-                post_uri = notification.uri
-                reply_text = "🤖 Beep boop! Thanks for mentioning me!"
-                
-                parent_ref = models.create_strong_ref(notification.record)
-                client.send_post(
-                    text=reply_text,
-                    reply_to=models.AppBskyFeedPost.ReplyRef(parent=parent_ref, root=parent_ref)
-                )
-                print(f"Replied to {post_uri}")
-    except Exception as e:
-        print(f"Reply error: {str(e)}")
-
-def main_loop():
-    """Main execution loop with intervals"""
-    while True:
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        post_text = request.form.get('text', '')
+        
+        if len(post_text) > 300:
+            flash('Post too long (max 300 characters)', 'danger')
+            return redirect(url_for('index'))
+        
         try:
-            # Example scheduled action
-            current_time = datetime.now().strftime("%H:%M")
-            post_message(f"🕒 Automated post at {current_time} UTC")
-            
-            # Check for mentions every run
-            reply_to_mentions()
-            
-            # Sleep for 15 minutes (900 seconds)
-            print("Sleeping for 24HRS ...")
-            time.sleep(86400)
-            
+            record = client.send_post(text=post_text)
+            flash('Post published successfully! 🚀', 'success')
+            return redirect(url_for('index'))
         except Exception as e:
-            print(f"Main loop error: {str(e)}")
-            time.sleep(60)  # Wait before retrying
+            flash(f'Error posting: {str(e)}', 'danger')
+    
+    return render_template('index.html')
 
-if __name__ == "__main__":
+@app.route('/health')
+def health():
+    return 'OK', 200
+
+if __name__ == '__main__':
     authenticate()
-    main_loop()
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
