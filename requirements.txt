@@ -1,5 +1,3 @@
 atproto>=0.1.25
 multiformats>=0.3.0
 python-dotenv>=1.0.0
---upgrade
---use-feature=2020-resolver
