@@ -55,8 +55,8 @@ def main_loop():
             reply_to_mentions()
             
             # Sleep for 15 minutes (900 seconds)
-            print("Sleeping for 15 minutes...")
-            time.sleep(900)
+            print("Sleeping for 24HRS ...")
+            time.sleep(86400)
             
         except Exception as e:
             print(f"Main loop error: {str(e)}")
